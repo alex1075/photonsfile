@@ -50,12 +50,36 @@ Low-level access to the decoder is also exported: `read_header`,
 numba is optional; without it the varint decode uses a vectorised numpy fallback.
 `photonsfile.have_numba()` reports which path is active.
 
+## Acknowledgement
+
+Thank you to **Photonscore GmbH** for supporting this work: they shared the LINCam
+SDK and a sample `.photons` file, and open-sourced the D7 storage format at
+[github.com/photonscore/d7](https://github.com/photonscore/d7) (Apache-2.0). At
+Photonscore's request, the credit here is to the company rather than to an
+individual.
+
 ## Provenance
 
-Reverse-engineered from the public D7 specification and checked bit-exact against
-the Photonscore SDK on a 284-million-photon sample. Thanks to Photonscore for
-open-sourcing the D7 format.
+The decoder is original code, first worked out from the SDK and the sample file,
+then checked field for field and bit-exact against the public D7 specification on a
+284-million-photon sample. No Photonscore source is redistributed here; the reader
+is pure Python (numpy, with an optional numba path) and needs none of Photonscore's
+native libraries.
+
+## Citation
+
+If you use photonsfile, please cite it via the DOI. Archived on Zenodo:
+
+<!-- After minting the Zenodo DOI, replace XXXXXXX in the badge and line below. -->
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.XXXXXXX.svg)](https://doi.org/10.5281/zenodo.XXXXXXX)
+
+> Hunt, A. *photonsfile: a pure-Python reader for Photonscore LINCam .photons
+> (D7) files*. Zenodo. https://doi.org/10.5281/zenodo.XXXXXXX
+
+Machine-readable metadata is in [`CITATION.cff`](CITATION.cff); GitHub shows a
+"Cite this repository" button from it.
 
 ## License
 
 MIT - see `LICENSE`.
+

@@ -1,0 +1,29 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata below."
+title: "photonsfile: a pure-Python reader for Photonscore LINCam .photons (D7) files"
+authors:
+  - family-names: Hunt
+    given-names: Alex
+type: software
+license: MIT
+version: 2026.7.8
+date-released: 2026-07-08
+repository-code: "https://github.com/alex1075/photonsfile"
+keywords:
+  - Photonscore
+  - LINCam
+  - D7
+  - photons
+  - TCSPC
+  - FLIM
+abstract: >-
+  A pure-Python reader for Photonscore LINCam .photons files, the D7 container.
+  numpy only, with optional numba acceleration for the zigzag-varint decode. It
+  decodes the per-photon x/y/dt/ms streams and bins them into an intensity image,
+  a TCSPC decay, or a (Y, X, H) FLIM cube. Written from the open-sourced D7
+  specification and validated bit-exact against the Photonscore SDK. Thank you to
+  Photonscore GmbH for sharing the LINCam SDK and a sample file and for
+  open-sourcing the D7 format; at their request the credit is to the company
+  rather than an individual.
+# After minting the Zenodo DOI, add it here (concept DOI, all-versions):
+# doi: 10.5281/zenodo.XXXXXXX

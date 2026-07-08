@@ -52,11 +52,9 @@ numba is optional; without it the varint decode uses a vectorised numpy fallback
 
 ## Acknowledgement
 
-Thank you to **Photonscore GmbH** for supporting this work: they shared the LINCam
-SDK and a sample `.photons` file, and open-sourced the D7 storage format at
-[github.com/photonscore/d7](https://github.com/photonscore/d7) (Apache-2.0). At
-Photonscore's request, the credit here is to the company rather than to an
-individual.
+Thank you to **Yury Prokazov (Photonscore)** for supporting this work: sharing the
+LINCam SDK and a sample `.photons` file, and open-sourcing the D7 storage format at
+[github.com/photonscore/d7](https://github.com/photonscore/d7).
 
 ## Provenance
 

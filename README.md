@@ -68,11 +68,14 @@ native libraries.
 
 If you use photonsfile, please cite it via the DOI. Archived on Zenodo:
 
-<!-- After minting the Zenodo DOI, replace XXXXXXX in the badge and line below. -->
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.XXXXXXX.svg)](https://doi.org/10.5281/zenodo.XXXXXXX)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21360199.svg)](https://doi.org/10.5281/zenodo.21360199)
 
 > Hunt, A. *photonsfile: a pure-Python reader for Photonscore LINCam .photons
-> (D7) files*. Zenodo. https://doi.org/10.5281/zenodo.XXXXXXX
+> (D7) files*. Zenodo. https://doi.org/10.5281/zenodo.21360199
+
+The DOI above is the concept DOI and always resolves to the latest version. To
+cite a specific version, use its own DOI (2026.7.14 is
+[10.5281/zenodo.21360200](https://doi.org/10.5281/zenodo.21360200)).
 
 Machine-readable metadata is in [`CITATION.cff`](CITATION.cff); GitHub shows a
 "Cite this repository" button from it.

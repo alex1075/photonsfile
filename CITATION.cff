@@ -25,5 +25,11 @@ abstract: >-
   Photonscore GmbH for sharing the LINCam SDK and a sample file and for
   open-sourcing the D7 format; at their request the credit is to the company
   rather than an individual.
-# After minting the Zenodo DOI, add it here (concept DOI, all-versions):
-# doi: 10.5281/zenodo.XXXXXXX
+doi: 10.5281/zenodo.21360199
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.21360199
+    description: Concept DOI, resolves to the latest version
+  - type: doi
+    value: 10.5281/zenodo.21360200
+    description: Version DOI for 2026.7.14

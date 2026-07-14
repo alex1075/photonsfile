@@ -70,8 +70,8 @@ If you use photonsfile, please cite it via the DOI. Archived on Zenodo:
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21360199.svg)](https://doi.org/10.5281/zenodo.21360199)
 
-> Hunt, A. *photonsfile: a pure-Python reader for Photonscore LINCam .photons
-> (D7) files*. Zenodo. https://doi.org/10.5281/zenodo.21360199
+> Hunt, A. and A. Akram. *photonsfile: a pure-Python reader for Photonscore LINCam
+> .photons (D7) files*. Zenodo. https://doi.org/10.5281/zenodo.21360199
 
 The DOI above is the concept DOI and always resolves to the latest version. To
 cite a specific version, use its own DOI (2026.7.14 is

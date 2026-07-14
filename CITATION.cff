@@ -4,8 +4,12 @@ title: "photonsfile: a pure-Python reader for Photonscore LINCam .photons (D7) f
 authors:
   - family-names: Hunt
     given-names: Alex
+    orcid: "https://orcid.org/0009-0006-2990-649X"
+    affiliation: "Centre for Inflammation Research, Institute for Regeneration and Repair, University of Edinburgh, Edinburgh, UK"
   - family-names: Akram
     given-names: Ahsan
+    orcid: "https://orcid.org/0000-0003-4605-1682"
+    affiliation: "Centre for Inflammation Research, Institute for Regeneration and Repair, University of Edinburgh, Edinburgh, UK"
 type: software
 license: MIT
 version: 2026.7.14

@@ -3,7 +3,7 @@ message: "If you use this software, please cite it using the metadata below."
 title: "photonsfile: a pure-Python reader for Photonscore LINCam .photons (D7) files"
 authors:
   - family-names: Hunt
-    given-names: Alex
+    given-names: Alexander
     orcid: "https://orcid.org/0009-0006-2990-649X"
     affiliation: "Centre for Inflammation Research, Institute for Regeneration and Repair, University of Edinburgh, Edinburgh, UK"
   - family-names: Akram

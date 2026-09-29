@@ -32,12 +32,13 @@ from ._d7 import (
     read_header,
     read_attributes,
     read_photons,
+    iter_photons,
     dataset_names,
     has_dual_tdc,
     _HAVE_NUMBA,
 )
 
-__version__ = '2026.7.8'
+__version__ = '2026.9.29'
 
 __all__ = [
     'PhotonsFile',
@@ -45,6 +46,7 @@ __all__ = [
     'read_header',
     'read_attributes',
     'read_photons',
+    'iter_photons',
     'dataset_names',
     'has_dual_tdc',
     'have_numba',
@@ -76,6 +78,7 @@ class PhotonsFile:
         self.tac_range = 1 << self.tac_bits
         self.tac_channel = self.attributes.get('/photons/TacChannel')
         self._photons = None
+        self._tac_checked = False
 
     def photons(self, wanted=('x', 'y', 'dt', 'ms')):
         """Return a dict of per-photon arrays for the requested datasets.
@@ -91,6 +94,7 @@ class PhotonsFile:
                 dt = dt[dt >= 0]
                 if dt.size:
                     self.tac_range = int(dt.max()) + 1
+                self._tac_checked = True
         return self._photons
 
     def tcspc_resolution(self, bins):
@@ -107,57 +111,88 @@ class PhotonsFile:
             return 0.0
         return period_s / bins if bins else 0.0
 
-    def _binned(self, pixels, binning):
-        s = self.photons()
-        x = np.asarray(s['x']).astype(np.int64)
-        y = np.asarray(s['y']).astype(np.int64)
-        dt = np.asarray(s['dt']).astype(np.int64)
-        n = min(x.shape[0], y.shape[0], dt.shape[0])
-        x, y, dt = x[:n], y[:n], dt[:n]
-        valid = ((x >= 0) & (x < self.position_range)
-                 & (y >= 0) & (y < self.position_range)
-                 & (dt >= 0) & (dt < self.tac_range))
-        return x[valid], y[valid], dt[valid]
+    def iter_photons(self, wanted=('x', 'y', 'dt'), chunk_blocks=32):
+        """Yield dicts of equal-length x, y, dt arrays without loading the file."""
+        return iter_photons(self.filename, wanted, chunk_blocks)
+
+    def _dual_tac_range(self):
+        if self._tac_checked == True:
+            return
+        self._tac_checked = True
+        if self._photons is not None and 'dt' in self._photons:
+            dt = np.asarray(self._photons['dt'])
+            top = int(dt.max()) if dt.size else -1
+        else:
+            top = -1
+            for ch in self.iter_photons(('dt',)):
+                if ch['dt'].size:
+                    top = max(top, int(ch['dt'].max()))
+        if top >= 0:
+            self.tac_range = top + 1
+
+    def _binned_chunks(self, pixels, bins, binning):
+        if self.dual_tdc == True:
+            self._dual_tac_range()
+        p = int(pixels)
+        b = int(bins)
+        for ch in self.iter_photons():
+            x = ch['x'].astype(np.int64)
+            y = ch['y'].astype(np.int64)
+            dt = ch['dt'].astype(np.int64)
+            valid = ((x >= 0) & (x < self.position_range)
+                     & (y >= 0) & (y < self.position_range)
+                     & (dt >= 0) & (dt < self.tac_range))
+            xi = (x[valid] * p) // self.position_range
+            yi = (y[valid] * p) // self.position_range
+            di = (dt[valid] * b) // self.tac_range
+            if binning > 1:
+                xi //= binning
+                yi //= binning
+            yield xi, yi, di
+
+    def _grid(self, pixels, binning):
+        p = int(pixels)
+        if binning > 1:
+            p = (p + binning - 1) // binning
+        return p
 
     def image(self, pixels=512, binning=1):
         """Return the `(Y, X)` intensity image, photon positions binned to a grid."""
-        x, y, _ = self._binned(pixels, binning)
-        p = int(pixels)
-        xi = (x * p) // self.position_range
-        yi = (y * p) // self.position_range
-        if binning > 1:
-            xi //= binning
-            yi //= binning
-            p = (p + binning - 1) // binning
+        p = self._grid(pixels, binning)
         if p == 0:
             return np.zeros((0, 0), dtype=np.uint32)
-        flat = yi * p + xi
-        return np.bincount(flat, minlength=p * p).reshape(p, p).astype(np.uint32)
+        out = np.zeros(p * p, dtype=np.uint64)
+        for xi, yi, _ in self._binned_chunks(pixels, 1, binning):
+            out += np.bincount(yi * p + xi, minlength=p * p).astype(np.uint64)
+        return out.reshape(p, p).astype(np.uint32)
 
     def decay(self, bins=256):
         """Return the summed TCSPC histogram of length `bins`."""
-        s = self.photons()
-        dt = np.asarray(s['dt']).astype(np.int64)
-        dt = dt[(dt >= 0) & (dt < self.tac_range)]
-        di = (dt * bins) // self.tac_range
-        return np.bincount(di, minlength=bins)[:bins].astype(np.uint32)
+        if self.dual_tdc == True:
+            self._dual_tac_range()
+        b = int(bins)
+        out = np.zeros(b, dtype=np.uint64)
+        for ch in self.iter_photons(('dt',)):
+            dt = ch['dt'].astype(np.int64)
+            dt = dt[(dt >= 0) & (dt < self.tac_range)]
+            out += np.bincount((dt * b) // self.tac_range, minlength=b)[:b].astype(np.uint64)
+        return out.astype(np.uint32)
 
     def flim_image(self, pixels=512, bins=256, binning=1):
-        """Return the `(Y, X, H)` FLIM cube: intensity image with a TCSPC axis."""
-        x, y, dt = self._binned(pixels, binning)
-        p = int(pixels)
+        """Return the `(Y, X, H)` FLIM cube: intensity image with a TCSPC axis.
+
+        Photons are streamed in chunks, so peak memory is about the size of
+        the cube rather than the size of the file.
+        """
+        p = self._grid(pixels, binning)
         b = int(bins)
-        xi = (x * p) // self.position_range
-        yi = (y * p) // self.position_range
-        di = (dt * b) // self.tac_range
-        if binning > 1:
-            xi //= binning
-            yi //= binning
-            p = (p + binning - 1) // binning
         if p == 0 or b == 0:
             return np.zeros((p, p, b), dtype=np.uint32)
-        flat = (yi * p + xi) * b + di
-        return np.bincount(flat, minlength=p * p * b).reshape(p, p, b).astype(np.uint32)
+        out = np.zeros(p * p * b, dtype=np.uint32)
+        for xi, yi, di in self._binned_chunks(pixels, b, binning):
+            u, c = np.unique((yi * p + xi) * b + di, return_counts=True)
+            out[u] += c.astype(np.uint32)
+        return out.reshape(p, p, b)
 
     def close(self):
         self._photons = None

@@ -33,18 +33,23 @@ def _strip_markers(raw, phys_start, page):
     b = np.frombuffer(raw, dtype=np.uint8)
     n = b.shape[0]
     first = (-phys_start) % page
-    if first >= n:
-        return b
-    m0 = np.arange(first, n, page)
     keep = np.ones(n, dtype=bool)
+    if phys_start % page == 1 and n > 0:
+        keep[0] = False
+    if first >= n:
+        return b[keep]
+    m0 = np.arange(first, n, page)
     keep[m0] = False
     m1 = m0[m0 + 1 < n] + 1
     keep[m1] = False
     return b[keep]
 
+def _marker_bytes_before(pos, page):
+    return 2 * (pos // page) + min(pos % page, 2)
+
 def _clean_pos(phys, region_start, page):
-    markers = (phys // page) - (region_start // page)
-    return (phys - region_start) - 2 * markers
+    markers = _marker_bytes_before(phys, page) - _marker_bytes_before(region_start, page)
+    return (phys - region_start) - markers
 
 def _parse_descriptor(payload):
     name = None
@@ -281,6 +286,96 @@ def _decode_region(fh, offsets, region_start, region_end, page, n_datasets):
     if not parts:
         return np.zeros(0, dtype=np.int64)
     return np.concatenate(parts)
+
+def _block_groups(fh, offs, all_offs, index_off, page, n_datasets, chunk_blocks):
+    # blocks of one dataset are not always adjacent (the final partial block
+    # sits at the end of the file), so read each adjacent run on its own
+    import bisect
+    for i in range(0, len(offs), chunk_blocks):
+        grp = offs[i:i + chunk_blocks]
+        parts = []
+        run = [grp[0]]
+        for o in grp[1:] + [None]:
+            j = bisect.bisect_right(all_offs, run[-1])
+            nxt = all_offs[j] if j < len(all_offs) else index_off
+            if o is not None and o == nxt:
+                run.append(o)
+                continue
+            parts.append(_decode_region(fh, run, run[0], min(nxt, index_off), page, n_datasets))
+            run = [o]
+        yield np.concatenate(parts) if len(parts) > 1 else parts[0]
+
+def iter_photons(path, wanted=('x', 'y', 'dt'), chunk_blocks=32):
+    """Yield dicts of equal-length per-photon arrays, a few blocks at a time.
+
+    Only x, y and dt are per-photon (ms is a per-millisecond photon index), so
+    only those can be streamed. Peak memory is set by chunk_blocks, not by the
+    file size; the concatenated chunks equal read_photons() truncated to the
+    shortest dataset.
+    """
+    for name in wanted:
+        if name not in ('x', 'y', 'dt'):
+            raise ValueError('iter_photons streams x, y and dt only, not ' + repr(name))
+    import os
+    header = read_header(path)
+    page = header['page_size']
+    datasets = header['datasets']
+    n_datasets = len(datasets)
+    id_by_name = {d['name']: i for i, d in enumerate(datasets)}
+    dtype_by_id = {i: d['dtype'] for i, d in enumerate(datasets)}
+    filesize = os.path.getsize(path)
+    dual = '/start/time' in id_by_name and '/stop/time' in id_by_name
+    with open(path, 'rb') as fh:
+        index_off = _read_epilogue(fh, filesize, page)
+        offsets = _parse_index(fh, index_off, filesize, page, n_datasets)
+        all_offs = sorted(o for v in offsets.values() for o in v)
+        sources = {}
+        for name in wanted:
+            if name == 'dt' and dual:
+                fulls = ['/start/time', '/stop/time']
+            else:
+                fulls = ['/photons/' + name]
+            if all(id_by_name.get(f) in offsets for f in fulls):
+                sources[name] = fulls
+        needed = []
+        for fulls in sources.values():
+            for f in fulls:
+                if f not in needed:
+                    needed.append(f)
+        if len(needed) == 0:
+            return
+        gens = {}
+        for f in needed:
+            gens[f] = _block_groups(fh, offsets[id_by_name[f]], all_offs, index_off,
+                                    page, n_datasets, chunk_blocks)
+        bufs = {f: np.zeros(0, dtype=np.int64) for f in needed}
+        done = {f: False for f in needed}
+        def pull(f):
+            try:
+                bufs[f] = np.concatenate((bufs[f], next(gens[f])))
+            except StopIteration:
+                done[f] = True
+        while True:
+            for f in needed:
+                if done[f] == False:
+                    pull(f)
+            top = max(len(b) for b in bufs.values())
+            for f in needed:
+                while len(bufs[f]) < top and done[f] == False:
+                    pull(f)
+            n = min(len(b) for b in bufs.values())
+            if n == 0:
+                return
+            out = {}
+            for name, fulls in sources.items():
+                if len(fulls) == 2:
+                    out[name] = bufs[fulls[1]][:n] - bufs[fulls[0]][:n]
+                else:
+                    did = id_by_name[fulls[0]]
+                    out[name] = bufs[fulls[0]][:n].astype(dtype_by_id.get(did) or np.int64, copy=False)
+            for f in needed:
+                bufs[f] = bufs[f][n:]
+            yield out
 
 def has_dual_tdc(path):
     names = set(dataset_names(path))

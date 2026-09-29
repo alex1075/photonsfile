@@ -44,8 +44,26 @@ with PhotonsFile('sample.photons') as f:
 img = imread('sample.photons')     # shortcut for the intensity image
 ```
 
+### Large files
+
+`image()`, `decay()` and `flim_image()` stream the file a few blocks at a time,
+so peak memory is about the size of the output, not the file. A 40-million-photon
+file bins to a 512 x 512 x 256 cube at about 0.5 GB peak, where loading every
+photon first took about 2.5 GB. To stream photons yourself:
+
+```python
+from photonsfile import iter_photons
+
+for chunk in iter_photons('big.photons'):     # dicts of equal-length arrays
+    x, y, dt = chunk['x'], chunk['y'], chunk['dt']
+```
+
+`iter_photons` covers `x`, `y` and `dt`. `ms` is not per photon (it indexes the
+photon stream once per millisecond), so read it with `read_photons`, which still
+loads whole datasets into memory.
+
 Low-level access to the decoder is also exported: `read_header`,
-`read_attributes`, `read_photons`, `dataset_names`, `has_dual_tdc`.
+`read_attributes`, `read_photons`, `iter_photons`, `dataset_names`, `has_dual_tdc`.
 
 numba is optional; without it the varint decode uses a vectorised numpy fallback.
 `photonsfile.have_numba()` reports which path is active.

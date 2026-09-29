@@ -8,6 +8,7 @@ except Exception:
 
 MAGIC = b'D7 Photons Data'
 _DEFAULT_PAGE = 16384
+_MAX_FRAGMENT = 16 * 1024 * 1024
 
 _DTYPES = {
     0: np.int8, 1: np.int16, 2: np.int32, 3: np.int64,
@@ -125,12 +126,52 @@ def _read_epilogue(fh, filesize, page):
     giof, _ = _read_varint(tail, j)
     return giof
 
+def _read_entry(fh, offset, filesize, page):
+    # reassemble one FileEntry from its fragments, as the D7 LogReader does:
+    # each fragment has a 2-byte little-endian header (bits 0-13 length,
+    # bit 14 end, bit 15 begin); a lone spare byte at a block end is padding
+    fh.seek(offset)
+    raw = fh.read(min(filesize - offset, _MAX_FRAGMENT + _MAX_FRAGMENT // (page - 2) * 2 + page))
+    out = bytearray()
+    i = 0
+    in_block = offset % page
+    found = False
+    while len(out) < _MAX_FRAGMENT:
+        if page - in_block == 1:
+            i += 1
+            in_block = 0
+        if i + 2 > len(raw):
+            raise ValueError('D7 entry at ' + str(offset) + ' is truncated')
+        h = raw[i] | (raw[i + 1] << 8)
+        i += 2
+        ln = h & 0x3fff
+        begin = (h & 0x8000) != 0
+        end = (h & 0x4000) != 0
+        if found == True and begin == True:
+            raise ValueError('D7 entry at ' + str(offset) + ' has a second begin fragment')
+        if in_block + 2 + ln > page:
+            raise ValueError('D7 fragment at ' + str(offset + i - 2) + ' crosses a block boundary')
+        in_block = (in_block + 2 + ln) % page
+        if found == False and begin == False:
+            i += ln
+            continue
+        found = True
+        if i + ln > len(raw):
+            raise ValueError('D7 entry at ' + str(offset) + ' is truncated')
+        out += raw[i:i + ln]
+        i += ln
+        if end == True:
+            return bytes(out)
+    raise ValueError('D7 entry at ' + str(offset) + ' exceeds the 16 MB fragment limit')
+
+def _index_body(fh, index_off, filesize, page):
+    entry = _read_entry(fh, index_off, filesize, page)
+    _tag, p = _read_varint(entry, 0)
+    ln, p = _read_varint(entry, p)
+    return entry[p:p + ln]
+
 def _parse_index(fh, index_off, filesize, page, n_datasets):
-    fh.seek(index_off)
-    idx = _strip_markers(fh.read(filesize - index_off), index_off, page).tobytes()
-    _tag, p = _read_varint(idx, 0)
-    ln, p = _read_varint(idx, p)
-    body = idx[p:p + ln]
+    body = _index_body(fh, index_off, filesize, page)
     offsets = {}
     i = 0
     n = len(body)
@@ -156,11 +197,7 @@ def read_attributes(path):
     filesize = os.path.getsize(path)
     with open(path, 'rb') as fh:
         index_off = _read_epilogue(fh, filesize, page)
-        fh.seek(index_off)
-        idx = _strip_markers(fh.read(filesize - index_off), index_off, page).tobytes()
-        _tag, p = _read_varint(idx, 0)
-        ln, p = _read_varint(idx, p)
-        body = idx[p:p + ln]
+        body = _index_body(fh, index_off, filesize, page)
     attrs = {}
     i = 0
     n = len(body)

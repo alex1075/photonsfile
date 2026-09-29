@@ -4,7 +4,7 @@ build-backend = 'setuptools.build_meta'
 
 [project]
 name = 'photonsfile'
-version = '2026.9.29'
+version = '2026.9.29.1'
 description = 'Read Photonscore LINCam .photons (D7) files'
 readme = 'README.md'
 requires-python = '>=3.10'

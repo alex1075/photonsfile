@@ -38,7 +38,7 @@ from ._d7 import (
     _HAVE_NUMBA,
 )
 
-__version__ = '2026.9.29'
+__version__ = '2026.9.29.1'
 
 __all__ = [
     'PhotonsFile',
